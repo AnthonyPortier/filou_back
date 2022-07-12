@@ -7,7 +7,8 @@ import cors from "cors";
 import multer from "multer";
 import fs from "fs";
 import axios from "axios";
-import e from "express";
+import { categories, coefficients, levels } from "./utils/payslipInfos.js";
+import {isDDMMYYYY} from "./utils/isDate.js";
 
 const corsOptions = {
   origin: "http://localhost:3000",
@@ -91,7 +92,6 @@ app.post("/upload/payslip", upload.single("file"), async (req, res, next) => {
   //treatWithAdapdativeThreshold();
   //tesseractFunc("adaptativeThreshold");
 
-  //GET SIRET / NAME ENTERPRISE / BRUT / NET
   const info = data.map((el) => {
     const textLowerCase = el
       .toLowerCase()
@@ -99,20 +99,28 @@ app.post("/upload/payslip", upload.single("file"), async (req, res, next) => {
       .replace(/à/g, "a")
       .replace(/ô/g, "o")
       .replace(/,/g, ".");
-
     const textLowerCaseSplited = textLowerCase.split(" ");
     const textLowerCaseRemoveSpace = textLowerCase.replace(
       /[^a-zA-Z0-9.]/g,
       ""
     );
-    const siret = textLowerCaseSplited.filter(
+
+    const allDates = textLowerCaseSplited.filter((el) => isDDMMYYYY(el));
+    const startDate = allDates[0];
+    const endDate = allDates[1];
+
+    const category = categories.find((t) => textLowerCase.includes(t));
+
+    const coefficient = coefficients.find((t) =>
+      textLowerCase.includes(` ${t} `)
+    );
+
+    const level = levels.find((t) => textLowerCase.includes(` ${t} `));
+
+    const siret = textLowerCaseSplited.find(
       (el) => el.length === 14 && Number(el)
     );
 
-    const apeOrNaf = textLowerCase
-      .split(/ape|naf/g)
-      .filter((el) => Number(el.charAt(0)))[0];
-    console.log(apeOrNaf, "apeOrNafapeOrNafapeOrNafapeOrNaf");
     const securiteSoc = textLowerCaseSplited.filter(
       (el) => el.length === 15 && Number(el)
     );
@@ -134,21 +142,26 @@ app.post("/upload/payslip", upload.single("file"), async (req, res, next) => {
       .split("netapayer")
       .filter((el) => Number(el.charAt(0)))[0];
 
-    if (siret && securiteSoc && job && brut && netBeforeTaxe && net) {
-      return {
-        siret,
-        securiteSoc: securiteSoc[0],
-        job: job.replace("emploi", ""),
-        brut: brut && brut.replace(/(^\d+\.\d+)(.+$)/i, "$1"),
-        net: net && net.replace(/(^\d+\.\d+)(.+$)/i, "$1"),
-        netBeforeTaxe:
-          netBeforeTaxe && netBeforeTaxe.replace(/(^\d+\.\d+)(.+$)/i, "$1"),
-      };
-    }
+    const mandatorySentence = textLowerCase.includes("www.service-public.fr");
+
+    return {
+      startDate,
+      endDate,
+      category,
+      coefficient,
+      level,
+      siret,
+      securiteSoc: securiteSoc[0],
+      job: job && job.replace("emploi", ""),
+      brut: brut && brut.replace(/(^\d+\.\d+)(.+$)/i, "$1"),
+      net: net && net.replace(/(^\d+\.\d+)(.+$)/i, "$1"),
+      netBeforeTaxe:
+        netBeforeTaxe && netBeforeTaxe.replace(/(^\d+\.\d+)(.+$)/i, "$1"),
+      mandatorySentence,
+    };
   });
   let uniq = {};
   const infoFiltered = info.filter((obj) => !uniq[obj] && (uniq[obj] = true));
-
   const dataGouv = await axios.get(
     `https://entreprise.data.gouv.fr/api/sirene/v3/etablissements/${infoFiltered[0].siret}`
   );
@@ -157,11 +170,11 @@ app.post("/upload/payslip", upload.single("file"), async (req, res, next) => {
   fs.writeFileSync(
     "./data.json",
     JSON.stringify({
-      ...infoFiltered[0],
-      ...dataGouv.data.etablissement,
+      info,
+      data,
     })
   );
-  res.json({ ...infoFiltered[0], ...dataGouv.data.etablissement });
+  res.json({ ...infoFiltered[0], company: dataGouv.data.etablissement });
 });
 
 app.listen(port, () => {

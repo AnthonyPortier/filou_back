@@ -1,24 +1,58 @@
-import { treatBadQuality } from "./opencv/treatBadQuality.js";
-import { treatToGray } from "./opencv/treatToGray.js";
-import { treatWithAdapdativeThreshold } from "./opencv/treatWithAdapdativeThreshold.js";
-import { tesseractFunc } from "./tesseract/tesseractFunc.js";
+// This Loads the configuration dynamically from to the current enviroment
+// Defaults to _dev_ if the environment was set
+import { env } from "custom-env";
 import express from "express";
 import cors from "cors";
 import multer from "multer";
 import fs from "fs";
 import axios from "axios";
+import mongoose from "mongoose";
+import bodyParser from "body-parser";
+import helmet from "helmet";
+import { treatBadQuality } from "./opencv/treatBadQuality.js";
+import { treatToGray } from "./opencv/treatToGray.js";
+import { treatWithAdapdativeThreshold } from "./opencv/treatWithAdapdativeThreshold.js";
+import { tesseractFunc } from "./tesseract/tesseractFunc.js";
 import { categories, coefficients, levels } from "./utils/payslipInfos.js";
-import {isDDMMYYYY} from "./utils/isDate.js";
+import { isDDMMYYYY } from "./utils/isDate.js";
+import { findBrut } from "./utils/find_inside_text/findBrut";
+import { findNetBeforeTaxes } from "./utils/find_inside_text/findNetBeforeTaxes";
 
+import router from "./routes";
+env(true);
 const corsOptions = {
   origin: "http://localhost:3000",
   credentials: true, //access-control-allow-credentials:true
   optionSuccessStatus: 200,
 };
+
 const upload = multer();
 const app = express();
 app.use(cors(corsOptions));
-const port = 8080;
+app.use(
+  bodyParser.urlencoded({
+    extended: true,
+  })
+);
+app.use(bodyParser.json());
+app.use(helmet());
+
+const port = process.env.PORT;
+const identifiant = process.env.IDENTIFIANT;
+const password = process.env.PASSWORD;
+const db = process.env.DB_NAME;
+mongoose.connect(
+  `mongodb+srv://${identifiant}:${password}@filoubdd.5buih.mongodb.net/${db}?retryWrites=true&w=majority`,
+  {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  },
+  () => console.log("database is connected")
+);
+
+app.use("/api", router);
+
+//////////////////////////////////////////////////////
 
 app.post("/upload/passeport", upload.single("file"), async (req, res, next) => {
   fs.writeFileSync(
@@ -96,9 +130,10 @@ app.post("/upload/payslip", upload.single("file"), async (req, res, next) => {
     const textLowerCase = el
       .toLowerCase()
       .replace(/\n/g, " ")
-      .replace(/à/g, "a")
-      .replace(/ô/g, "o")
-      .replace(/,/g, ".");
+      .replace(/,/g, ".")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
     const textLowerCaseSplited = textLowerCase.split(" ");
     const textLowerCaseRemoveSpace = textLowerCase.replace(
       /[^a-zA-Z0-9.]/g,
@@ -130,19 +165,15 @@ app.post("/upload/payslip", upload.single("file"), async (req, res, next) => {
       .split("\n")
       .filter((el) => el.includes("emploi"))[0];
 
-    const brut = textLowerCaseRemoveSpace
-      .split("brut")
-      .filter((el) => Number(el.charAt(0)))[0];
+    const brut = findBrut(textLowerCaseRemoveSpace);
 
-    const netBeforeTaxe = textLowerCaseRemoveSpace
-      .split("netapayeravantimpotsurlerevenu")
-      .filter((el) => Number(el.charAt(0)))[0];
+    const netBeforeTaxes = findNetBeforeTaxes(textLowerCaseRemoveSpace);
 
     const net = textLowerCaseRemoveSpace
       .split("netapayer")
       .filter((el) => Number(el.charAt(0)))[0];
 
-    const mandatorySentence = textLowerCase.includes("www.service-public.fr");
+    const mandatorySentence = textLowerCase.includes("service-public.fr");
 
     return {
       startDate,
@@ -153,10 +184,9 @@ app.post("/upload/payslip", upload.single("file"), async (req, res, next) => {
       siret,
       securiteSoc: securiteSoc[0],
       job: job && job.replace("emploi", ""),
-      brut: brut && brut.replace(/(^\d+\.\d+)(.+$)/i, "$1"),
+      brut: brut && brut,
       net: net && net.replace(/(^\d+\.\d+)(.+$)/i, "$1"),
-      netBeforeTaxe:
-        netBeforeTaxe && netBeforeTaxe.replace(/(^\d+\.\d+)(.+$)/i, "$1"),
+      netBeforeTaxes: netBeforeTaxes && netBeforeTaxes,
       mandatorySentence,
     };
   });

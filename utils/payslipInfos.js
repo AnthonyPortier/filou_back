@@ -16,8 +16,10 @@ export const coefficients = [
   "130",
   "140",
   "150",
+  "160",
   "170",
   "190",
+  "215",
   "220",
   "240",
   "260",
@@ -25,7 +27,12 @@ export const coefficients = [
   "300",
   "360",
   "450",
-  "500"
+  "500",
 ];
 
-export const categories=["cadre", "profession intermédiaire", "employé", "ouvrier"]
+export const categories = [
+  "cadre",
+  "profession intermédiaire",
+  "employé",
+  "ouvrier"
+];

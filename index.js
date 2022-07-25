@@ -166,7 +166,6 @@ app.post("/upload/payslip", upload.single("file"), async (req, res, next) => {
       .filter((el) => el.includes("emploi"))[0];
 
     const brut = findBrut(textLowerCaseRemoveSpace);
-
     const netBeforeTaxes = findNetBeforeTaxes(textLowerCaseRemoveSpace);
 
     const net = textLowerCaseRemoveSpace

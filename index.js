@@ -9,6 +9,7 @@ import axios from "axios";
 import mongoose from "mongoose";
 import bodyParser from "body-parser";
 import helmet from "helmet";
+import jwt from "jsonwebtoken";
 import { treatBadQuality } from "./opencv/treatBadQuality.js";
 import { treatToGray } from "./opencv/treatToGray.js";
 import { treatWithAdapdativeThreshold } from "./opencv/treatWithAdapdativeThreshold.js";
@@ -25,6 +26,7 @@ const corsOptions = {
   credentials: true, //access-control-allow-credentials:true
   optionSuccessStatus: 200,
 };
+const secret_key = process.env.SECRET_KEY;
 
 const upload = multer();
 const app = express();
@@ -50,11 +52,33 @@ mongoose.connect(
   () => console.log("database is connected")
 );
 
+// JWT setup
+app.use((req, res, next) => {
+  if (
+    req.headers &&
+    req.headers.authorization &&
+    req.headers.authorization.split(" ")[0] === "JWT"
+  ) {
+    jwt.verify(
+      req.headers.authorization.split(" ")[1],
+      secret_key,
+      (err, decode) => {
+        if (err) req.user = undefined;
+        req.user = decode;
+        next();
+      }
+    );
+  } else {
+    req.user = undefined;
+    next();
+  }
+});
+
 app.use("/api", router);
 
 //////////////////////////////////////////////////////
 
-app.post("/upload/passeport", upload.single("file"), async (req, res, next) => {
+app.post("/upload/passport", upload.single("file"), async (req, res, next) => {
   fs.writeFileSync(
     "./img/imageToTreat.png",
     req.file.buffer,

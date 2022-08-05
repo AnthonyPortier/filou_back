@@ -2,7 +2,7 @@ import pkg from "mongoose";
 const { Types } = pkg;
 import { Project, Payslip } from "../../models";
 
-export const addPayslip = async (req, res) => {
+export const createPayslip = async (req, res) => {
   const {
     startDate,
     endDate,

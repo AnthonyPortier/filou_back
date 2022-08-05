@@ -1,8 +1,11 @@
-import { User } from "../../models";
+import { User,Project } from "../../models";
 
 export const getProjects = async (req, res) => {
-
   const user = await User.findById(req.user._id);
-
-  res.json({ projects: user.projects });
+  const projects = await Project.find({
+    _id: {
+      $in: user.projects,
+    },
+  });
+  res.json({ projects });
 };

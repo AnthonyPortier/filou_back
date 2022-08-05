@@ -1,7 +1,11 @@
 import { Router } from "express";
 const payslipRouter = Router();
-import { addPayslip } from "../controllers/payslip/add-payslip";
+import { createPayslip } from "../controllers/payslip/create-payslip";
+import { getPayslip } from "../controllers/payslip/get-payslip";
 
-payslipRouter.post("/add-payslip", addPayslip);
+payslipRouter.get("/get-payslip/:id/:index", getPayslip);
+
+////////////////////////////
+payslipRouter.post("/create-payslip", createPayslip);
 
 export default payslipRouter;
